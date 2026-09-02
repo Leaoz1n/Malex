@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Sistema Malex</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  <div class="evento-topo" id="eventoTopo">Global</div>
+  <img src="../assets/img/logo.jpeg" class="logo-topo" alt="Logo JRTecnologia">
+</div>
+
+<div class="sidebar hidden" id="sidebar">
+  <div>
+    <a href="dashboard.html" data-role="Master,Supervisor,Operador">Dashboard</a>
+    <a href="eventos.html" data-role="Master">Eventos</a>
+    <a href="usuarios.html" data-role="Master">Usuários</a>
+    <a href="cadastros.html" data-role="Master,Supervisor,Operador">Guarda-volumes</a>
+    <a href="vendas.html" data-role="Master,Supervisor,Operador">Vendas</a>
+    <a href="relatorios.html" data-role="Master,Supervisor">Relatórios</a>
+    <a href="configuracoes.html" data-role="Master">Configurações</a>
+  </div>
+
+  <div class="menu-user" id="menuUserInfo"></div>
+</div>
+
+<div class="main">
+  <h1>Dashboard</h1>
+
+  <div id="filtroEventoDashboard" class="card"></div>
+
+  <div class="dashboard-grid">
+    <div class="card grafico-card">
+      <h3>Cadastros por Dia</h3>
+      <canvas id="graficoCadastrosDia" width="280" height="280"></canvas>
+      <div id="legendaCadastrosDia"></div>
+    </div>
+
+    <div class="card grafico-card">
+      <h3>Volumes por Dia</h3>
+      <canvas id="graficoVolumesDia" width="280" height="280"></canvas>
+      <div id="legendaVolumesDia"></div>
+    </div>
+
+    <div class="card grafico-card">
+      <h3>Valor Arrecadado por Dia</h3>
+      <canvas id="graficoValorDia" width="280" height="280"></canvas>
+      <div id="legendaValorDia"></div>
+    </div>
+
+    <div class="card grafico-card">
+      <h3>Pagamentos</h3>
+      <canvas id="graficoPagamento" width="280" height="280"></canvas>
+      <div id="legendaPagamento"></div>
+    </div>
+
+    <div class="card grafico-card dashboard-full">
+      <h3>Cadastros por Funcionário e Dia</h3>
+      <canvas id="graficoUsuariosDia" width="320" height="320"></canvas>
+      <div id="legendaUsuariosDia"></div>
+    </div>
+  </div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/menu.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/supabase.js"></script>
+
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/dashboard-supabase.js"></script>
+
+<script>
+  iniciarDashboard();
+</script>
+
+</body>
+</html>

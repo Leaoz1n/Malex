@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Usuários - Sistema Malex</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  <div class="evento-topo" id="eventoTopo">Global</div>
+  <img src="../assets/img/logo.jpeg" class="logo-topo" alt="Logo JRTecnologia">
+</div>
+
+<div class="sidebar hidden" id="sidebar">
+  <div>
+    <a href="dashboard.html" data-role="Master,Supervisor,Operador">Dashboard</a>
+    <a href="eventos.html" data-role="Master">Eventos</a>
+    <a href="usuarios.html" data-role="Master">Usuários</a>
+    <a href="cadastros.html" data-role="Master,Supervisor,Operador">Guarda-volumes</a>
+    <a href="vendas.html" data-role="Master,Supervisor,Operador">Vendas</a>
+    <a href="relatorios.html" data-role="Master,Supervisor">Relatórios</a>
+    <a href="configuracoes.html" data-role="Master">Configurações</a>
+  </div>
+  <div class="menu-user" id="menuUserInfo"></div>
+</div>
+
+<div class="main">
+  <h1>Usuários</h1>
+
+  <div class="card">
+    <h3>Novo Usuário</h3>
+
+    <input id="nomeUsuario" placeholder="Nome">
+    <input id="loginUsuario" placeholder="Login">
+    <input id="senhaUsuario" placeholder="Senha Temporária">
+
+    <select id="cargoUsuario">
+      <option value="Supervisor">Supervisor</option>
+      <option value="Operador">Operador</option>
+      <option value="Master">Master</option>
+    </select>
+
+    <select id="eventoUsuario" class="selectEventos"></select>
+
+    <h4>Permissões do usuário</h4>
+    <label><input type="checkbox" id="usuarioPermitirEdicao" checked> Permitir edição</label>
+    <label><input type="checkbox" id="usuarioPermitirExclusao"> Permitir exclusão</label>
+
+    <button onclick="criarUsuario()">Salvar Usuário</button>
+  </div>
+
+  <h2>Usuários Cadastrados</h2>
+  <div id="listaUsuarios"></div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/menu.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/supabase.js"></script>
+
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/usuarios-supabase.js"></script>
+
+<script>
+  setLayoutInfo();
+  carregarEventosSelect();
+  listarUsuarios();
+</script>
+
+</body>
+</html>

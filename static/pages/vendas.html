@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vendas - Sistema Malex</title>
+  <link rel="stylesheet" href="../assets/css/style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <button class="menu-btn" onclick="toggleMenu()">☰</button>
+  <div class="evento-topo" id="eventoTopo">Global</div>
+  <img src="../assets/img/logo.jpeg" class="logo-topo" alt="Logo JRTecnologia">
+</div>
+
+<div class="sidebar hidden" id="sidebar">
+  <div>
+    <a href="dashboard.html" data-role="Master,Supervisor,Operador">Dashboard</a>
+    <a href="eventos.html" data-role="Master">Eventos</a>
+    <a href="usuarios.html" data-role="Master">Usuários</a>
+    <a href="cadastros.html" data-role="Master,Supervisor,Operador">Guarda-volumes</a>
+    <a href="vendas.html" data-role="Master,Supervisor,Operador">Vendas</a>
+    <a href="relatorios.html" data-role="Master,Supervisor">Relatórios</a>
+    <a href="configuracoes.html" data-role="Master">Configurações</a>
+  </div>
+
+  <div class="menu-user" id="menuUserInfo"></div>
+</div>
+
+<div class="main">
+  <h1>Vendas</h1>
+
+  <div id="statusOfflineVendas" class="offline-status"></div>
+
+  <div class="card">
+    <h3>Nova Venda</h3>
+
+    <select id="eventoVenda" class="selectEventos" onchange="atualizarCamposVenda(); atualizarProdutosVenda(); listarVendas();"></select>
+
+    <select id="produtoVenda" onchange="atualizarValorTotalVenda()">
+      <option value="">Selecione um produto</option>
+    </select>
+
+    <input id="nomeClienteVenda" placeholder="Nome">
+
+    <input
+      type="text"
+      id="telefoneClienteVenda"
+      placeholder="(11) 99999-9999"
+      maxlength="15"
+      oninput="mascaraTelefone(this)"
+    >
+
+    <div id="campoCPFVenda" style="display:none;">
+      <input id="cpfClienteVenda" placeholder="CPF/CNPJ">
+    </div>
+
+    <div id="campoEmailVenda" style="display:none;">
+      <input id="emailClienteVenda" placeholder="E-mail">
+    </div>
+
+    <input id="quantidadeVenda" type="number" min="1" value="1" placeholder="Quantidade" oninput="atualizarValorTotalVenda()">
+
+    <div class="total-preview" id="valorTotalPreviewVenda">Total: R$ 0,00</div>
+
+    <h4>Forma de Pagamento</h4>
+    <div id="pagamentosVenda" class="pagamentos-linha"></div>
+
+    <input id="observacoesVenda" placeholder="Observações">
+
+    <button onclick="registrarVenda()">Registrar Venda</button>
+    <button onclick="sincronizarVendasOffline()">Sincronizar pendentes</button>
+  </div>
+
+  <h2>Vendas</h2>
+
+  <div class="card">
+    <select id="tipoPesquisaVenda" onchange="listarVendas()">
+      <option value="nome">Nome</option>
+      <option value="telefone">Telefone</option>
+      <option value="cpf">CPF/CNPJ</option>
+      <option value="produto">Produto</option>
+    </select>
+
+    <input id="pesquisaVenda" placeholder="Pesquisar" oninput="listarVendas()">
+  </div>
+
+  <div id="listaVendas"></div>
+</div>
+
+<script src="../assets/js/auth.js"></script>
+<script src="../assets/js/menu.js"></script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="../assets/js/supabase.js"></script>
+
+<script src="../assets/js/app.js"></script>
+<script src="../assets/js/cadastros-supabase.js"></script>
+<script src="../assets/js/vendas-supabase.js"></script>
+
+<script>
+  iniciarTelaVendas();
+</script>
+
+</body>
+</html>
