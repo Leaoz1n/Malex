@@ -16,7 +16,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 st.set_page_config(page_title="Sistema Malex", page_icon="📦", layout="wide")
 
-SUPABASE_URL = "https://lnureygnpxpunaoghktq.supabase.co/rest/v1/"
+SUPABASE_URL = "https://lnureygnpxpunaoghktq.supabase.co/rest/v1"
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
