@@ -1,22 +1,3 @@
-# ============================================================
-# SISTEMA MALEX - app.py (Streamlit nativo)
-# Segue o mesmo padrão do sistema de notas: tudo em um arquivo só,
-# usando st.secrets para credenciais e a lib "supabase" (Python) para
-# falar com o banco. Usa as MESMAS tabelas que o sistema já tinha
-# (eventos, cadastros, produtos, vendas, usuarios, formas_pagamento) -
-# nenhum dado existente é apagado ou precisa ser migrado.
-#
-# O que muda de comportamento em relação à versão HTML/JS:
-#   - Impressão de Etiqueta e Recibo agora geram um PDF para baixar
-#     (em vez de abrir uma janela do navegador com "Imprimir").
-#   - Não existe mais modo offline: como o Streamlit roda no servidor,
-#     é preciso estar online para usar o sistema.
-#   - Configuração de impressora por evento agora fica salva no banco
-#     (tabela config_impressora), porque não existe mais "localStorage
-#     do navegador" no Streamlit. É só rodar o SQL novo (ver
-#     SUPABASE_SETUP_STREAMLIT.sql) uma vez.
-# ============================================================
-
 import io
 import base64
 from datetime import datetime, date
@@ -36,7 +17,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 st.set_page_config(page_title="Sistema Malex", page_icon="📦", layout="wide")
 
-SUPABASE_URL = "https://SEU-PROJETO.supabase.co"  # troque pela URL do seu projeto
+SUPABASE_URL = "https://lnureygnpxpunaoghktq.supabase.co"  # troque pela URL do seu projeto
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
