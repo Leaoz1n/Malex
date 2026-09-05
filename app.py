@@ -1,4 +1,24 @@
+# ============================================================
+# SISTEMA MALEX - app.py (Streamlit nativo)
+# Segue o mesmo padrão do sistema de notas: tudo em um arquivo só,
+# usando st.secrets para credenciais e a lib "supabase" (Python) para
+# falar com o banco. Usa as MESMAS tabelas que o sistema já tinha
+# (eventos, cadastros, produtos, vendas, usuarios, formas_pagamento) -
+# nenhum dado existente é apagado ou precisa ser migrado.
+#
+# O que muda de comportamento em relação à versão HTML/JS:
+#   - Impressão de Etiqueta e Recibo agora geram um PDF para baixar
+#     (em vez de abrir uma janela do navegador com "Imprimir").
+#   - Não existe mais modo offline: como o Streamlit roda no servidor,
+#     é preciso estar online para usar o sistema.
+#   - Configuração de impressora por evento agora fica salva no banco
+#     (tabela config_impressora), porque não existe mais "localStorage
+#     do navegador" no Streamlit. É só rodar o SQL novo (ver
+#     SUPABASE_SETUP_STREAMLIT.sql) uma vez.
+# ============================================================
+
 import io
+import base64
 from datetime import datetime, date
 
 import pandas as pd
@@ -9,14 +29,14 @@ from supabase import create_client, Client
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib import colors
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image as ImagemPDF
 from reportlab.lib.styles import getSampleStyleSheet
 
 # ---------------- Configuração básica ----------------
 
 st.set_page_config(page_title="Sistema Malex", page_icon="📦", layout="wide")
 
-SUPABASE_URL = "https://lnureygnpxpunaoghktq.supabase.co"
+SUPABASE_URL = "https://SEU-PROJETO.supabase.co"  # troque pela URL do seu projeto
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
@@ -91,6 +111,28 @@ def normalizar_malas(valor):
     if isinstance(valor, str):
         return [v.strip() for v in valor.split(",") if v.strip()]
     return []
+
+
+def imagem_topo_pdf(evento, largura_max=160 * mm):
+    """Converte o topo do evento (base64 salvo em eventos.topo_evento) em
+    uma Image do reportlab, mantendo a proporção. Retorna None se o
+    evento não tiver topo configurado ou se a imagem vier corrompida."""
+    if not evento or not evento.get("topo_evento"):
+        return None
+
+    try:
+        dados = evento["topo_evento"]
+        if "," in dados:
+            dados = dados.split(",", 1)[1]
+        conteudo = base64.b64decode(dados)
+
+        img = ImagemPDF(io.BytesIO(conteudo))
+        proporcao = img.imageHeight / img.imageWidth
+        img.drawWidth = largura_max
+        img.drawHeight = largura_max * proporcao
+        return img
+    except Exception:
+        return None
 
 
 # ---------------- Sessão / autenticação ----------------
@@ -612,11 +654,16 @@ def gerar_pdf_recibo(registro, tipo, evento):
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30, bottomMargin=30)
     estilos = getSampleStyleSheet()
-    elementos = [
-        Paragraph("RECIBO", estilos["Title"]),
-        Paragraph(evento["nome"] if evento else "", estilos["Normal"]),
-        Spacer(1, 14),
-    ]
+    elementos = []
+
+    topo = imagem_topo_pdf(evento)
+    if topo:
+        elementos.append(topo)
+        elementos.append(Spacer(1, 10))
+
+    elementos.append(Paragraph("RECIBO", estilos["Title"]))
+    elementos.append(Paragraph(evento["nome"] if evento else "", estilos["Normal"]))
+    elementos.append(Spacer(1, 14))
 
     linhas = [["Cliente", registro.get("nome", "")], ["Telefone", registro.get("telefone", "")]]
 
@@ -712,7 +759,7 @@ def pagina_guarda_volumes():
 
     cpf = email = ""
     if evento.get("mostrar_cpf"):
-        cpf = st.text_input("CPF" + (" *" if evento.get("cpf_obrigatorio") else " (opcional)"), key="gv_cpf")
+        cpf = st.text_input("CPF/CNPJ" + (" *" if evento.get("cpf_obrigatorio") else " (opcional)"), key="gv_cpf")
     if evento.get("mostrar_email"):
         email = st.text_input("E-mail" + (" *" if evento.get("email_obrigatorio") else " (opcional)"), key="gv_email")
 
@@ -737,9 +784,9 @@ def pagina_guarda_volumes():
         elif len(malas) != qtd:
             st.error(f"Você informou {qtd} volume(s), mas digitou {len(malas)} número(s) de mala.")
         elif evento.get("cpf_obrigatorio") and not cpf:
-            st.error("CPF é obrigatório neste evento.")
-        elif cpf and not validar_cpf(cpf):
-            st.error("CPF inválido.")
+            st.error("CPF/CNPJ é obrigatório neste evento.")
+        elif cpf and not validar_cpf_cnpj(cpf):
+            st.error("CPF/CNPJ inválido.")
         elif evento.get("email_obrigatorio") and not email:
             st.error("E-mail é obrigatório neste evento.")
         elif not forma_pagamento:
@@ -793,42 +840,57 @@ def pagina_guarda_volumes():
         with st.container(border=True):
             malas_r = normalizar_malas(r.get("numeros_malas"))
             status = "🟢 Retirado" if r.get("retirado") else "🟡 Pendente"
-            st.markdown(
-                f"**{r['nome']}** — {r['telefone']}  \n"
-                f"Volumes: {r['quantidade_volumes']} (malas: {', '.join(malas_r)}) | "
-                f"{r.get('forma_pagamento','')} | {moeda(r.get('valor_total'))} | {status}"
-            )
+
+            col_info, col_acoes = st.columns([5, 1])
+
+            with col_info:
+                st.markdown(
+                    f"**{r['nome']}** — {r['telefone']}  \n"
+                    f"Volumes: {r['quantidade_volumes']} (malas: {', '.join(malas_r)}) | "
+                    f"{r.get('forma_pagamento','')} | {moeda(r.get('valor_total'))} | {status}"
+                )
 
             pode_editar = user["cargo"] == "Master" or user.get("permitir_edicao")
             pode_excluir = user["cargo"] == "Master" or user.get("permitir_exclusao")
 
-            cols = st.columns(5)
+            with col_acoes:
+                with st.popover("•••", use_container_width=True):
+                    if st.button("Ver detalhes", key=f"detalhes_gv_{r['id']}", use_container_width=True):
+                        st.session_state[f"mostrar_detalhes_gv_{r['id']}"] = not st.session_state.get(f"mostrar_detalhes_gv_{r['id']}", False)
 
-            with cols[0]:
-                if not r.get("retirado"):
-                    if st.button("Marcar retirado", key=f"retirado_{r['id']}"):
-                        supabase.table("cadastros").update({"retirado": True, "data_retirada": agora_iso()}).eq("id", r["id"]).execute()
-                        st.rerun()
+                    pdf_recibo = gerar_pdf_recibo(r, "guarda_volumes", evento)
+                    st.download_button("Recibo (PDF)", pdf_recibo, file_name=f"recibo_{r['id']}.pdf", mime="application/pdf", key=f"recibo_{r['id']}", use_container_width=True)
 
-            with cols[1]:
-                pdf_recibo = gerar_pdf_recibo(r, "guarda_volumes", evento)
-                st.download_button("Recibo (PDF)", pdf_recibo, file_name=f"recibo_{r['id']}.pdf", mime="application/pdf", key=f"recibo_{r['id']}")
+                    if evento.get("permitir_impressao") and malas_r:
+                        pdf_etq = gerar_pdf_etiquetas(r, evento, config_impressora)
+                        st.download_button("Etiqueta (PDF)", pdf_etq, file_name=f"etiqueta_{r['id']}.pdf", mime="application/pdf", key=f"etiqueta_{r['id']}", use_container_width=True)
 
-            with cols[2]:
-                if evento.get("permitir_impressao") and malas_r:
-                    pdf_etq = gerar_pdf_etiquetas(r, evento, config_impressora)
-                    st.download_button("Etiqueta (PDF)", pdf_etq, file_name=f"etiqueta_{r['id']}.pdf", mime="application/pdf", key=f"etiqueta_{r['id']}")
+                    if not r.get("retirado"):
+                        if st.button("Marcar retirado", key=f"retirado_{r['id']}", use_container_width=True):
+                            supabase.table("cadastros").update({"retirado": True, "data_retirada": agora_iso()}).eq("id", r["id"]).execute()
+                            st.rerun()
+                    else:
+                        if st.button("Marcar pendente", key=f"pendente_{r['id']}", use_container_width=True):
+                            supabase.table("cadastros").update({"retirado": False, "data_retirada": None}).eq("id", r["id"]).execute()
+                            st.rerun()
 
-            with cols[3]:
-                if pode_editar:
-                    if st.button("Editar", key=f"editar_gv_{r['id']}"):
-                        st.session_state[f"editando_gv_{r['id']}"] = True
+                    if pode_editar:
+                        if st.button("Editar", key=f"editar_gv_{r['id']}", use_container_width=True):
+                            st.session_state[f"editando_gv_{r['id']}"] = True
 
-            with cols[4]:
-                if pode_excluir:
-                    if st.button("Excluir", key=f"excluir_gv_{r['id']}"):
-                        supabase.table("cadastros").delete().eq("id", r["id"]).execute()
-                        st.rerun()
+                    if pode_excluir:
+                        if st.button("Excluir", key=f"excluir_gv_{r['id']}", use_container_width=True):
+                            supabase.table("cadastros").delete().eq("id", r["id"]).execute()
+                            st.rerun()
+
+            if st.session_state.get(f"mostrar_detalhes_gv_{r['id']}"):
+                st.markdown(
+                    f"**CPF/CNPJ:** {r.get('cpf') or '-'}  \n"
+                    f"**E-mail:** {r.get('email') or '-'}  \n"
+                    f"**Data do cadastro:** {str(r.get('created_at') or '')[:16].replace('T', ' ')}  \n"
+                    f"**Data de retirada:** {str(r.get('data_retirada') or '-')[:16].replace('T', ' ')}  \n"
+                    f"**Observações:** {r.get('observacoes') or '-'}"
+                )
 
             if st.session_state.get(f"editando_gv_{r['id']}"):
                 novo_nome = st.text_input("Nome", value=r["nome"], key=f"novo_nome_gv_{r['id']}")
@@ -887,6 +949,8 @@ def pagina_vendas():
             st.error("Preencha nome e telefone.")
         elif evento.get("cpf_obrigatorio") and not cpf:
             st.error("CPF/CNPJ é obrigatório neste evento.")
+        elif cpf and not validar_cpf_cnpj(cpf):
+            st.error("CPF/CNPJ inválido.")
         elif evento.get("email_obrigatorio") and not email:
             st.error("E-mail é obrigatório neste evento.")
         elif not forma_pagamento:
@@ -928,31 +992,42 @@ def pagina_vendas():
 
     for r in registros:
         with st.container(border=True):
-            st.markdown(
-                f"**{r['nome']}** — {r['telefone']}  \n"
-                f"Produto: {r['produto_nome']} | Qtd: {r['quantidade']} | "
-                f"{r.get('forma_pagamento','')} | {moeda(r.get('valor_total'))}"
-            )
+            col_info, col_acoes = st.columns([5, 1])
+
+            with col_info:
+                st.markdown(
+                    f"**{r['nome']}** — {r['telefone']}  \n"
+                    f"Produto: {r['produto_nome']} | Qtd: {r['quantidade']} | "
+                    f"{r.get('forma_pagamento','')} | {moeda(r.get('valor_total'))}"
+                )
 
             pode_editar = user["cargo"] == "Master" or user.get("permitir_edicao")
             pode_excluir = user["cargo"] == "Master" or user.get("permitir_exclusao")
 
-            cols = st.columns(3)
+            with col_acoes:
+                with st.popover("•••", use_container_width=True):
+                    if st.button("Ver detalhes", key=f"detalhes_vd_{r['id']}", use_container_width=True):
+                        st.session_state[f"mostrar_detalhes_vd_{r['id']}"] = not st.session_state.get(f"mostrar_detalhes_vd_{r['id']}", False)
 
-            with cols[0]:
-                pdf_recibo = gerar_pdf_recibo(r, "venda", evento)
-                st.download_button("Recibo (PDF)", pdf_recibo, file_name=f"recibo_venda_{r['id']}.pdf", mime="application/pdf", key=f"recibo_vd_{r['id']}")
+                    pdf_recibo = gerar_pdf_recibo(r, "venda", evento)
+                    st.download_button("Recibo (PDF)", pdf_recibo, file_name=f"recibo_venda_{r['id']}.pdf", mime="application/pdf", key=f"recibo_vd_{r['id']}", use_container_width=True)
 
-            with cols[1]:
-                if pode_editar:
-                    if st.button("Editar", key=f"editar_vd_{r['id']}"):
-                        st.session_state[f"editando_vd_{r['id']}"] = True
+                    if pode_editar:
+                        if st.button("Editar", key=f"editar_vd_{r['id']}", use_container_width=True):
+                            st.session_state[f"editando_vd_{r['id']}"] = True
 
-            with cols[2]:
-                if pode_excluir:
-                    if st.button("Excluir", key=f"excluir_vd_{r['id']}"):
-                        supabase.table("vendas").delete().eq("id", r["id"]).execute()
-                        st.rerun()
+                    if pode_excluir:
+                        if st.button("Excluir", key=f"excluir_vd_{r['id']}", use_container_width=True):
+                            supabase.table("vendas").delete().eq("id", r["id"]).execute()
+                            st.rerun()
+
+            if st.session_state.get(f"mostrar_detalhes_vd_{r['id']}"):
+                st.markdown(
+                    f"**CPF/CNPJ:** {r.get('cpf') or '-'}  \n"
+                    f"**E-mail:** {r.get('email') or '-'}  \n"
+                    f"**Data da venda:** {str(r.get('created_at') or '')[:16].replace('T', ' ')}  \n"
+                    f"**Observações:** {r.get('observacoes') or '-'}"
+                )
 
             if st.session_state.get(f"editando_vd_{r['id']}"):
                 novo_nome = st.text_input("Nome", value=r["nome"], key=f"novo_nome_vd_{r['id']}")
@@ -969,13 +1044,18 @@ def gerar_pdf_relatorio(df, evento, data_inicio, data_fim, tipo):
     doc = SimpleDocTemplate(buffer, pagesize=A4, topMargin=30, bottomMargin=30)
     estilos = getSampleStyleSheet()
 
-    elementos = [
-        Paragraph(f"Relatório — {evento['nome'] if evento else ''}", estilos["Title"]),
-        Paragraph(f"Tipo: {tipo} | Período: {data_inicio} a {data_fim}", estilos["Normal"]),
-        Spacer(1, 10),
-        Paragraph(f"Registros: {len(df)} | Quantidade total: {int(df['quantidade'].fillna(0).sum())} | Valor total: {moeda(df['valor_total'].fillna(0).sum())}", estilos["Normal"]),
-        Spacer(1, 14),
-    ]
+    elementos = []
+
+    topo = imagem_topo_pdf(evento)
+    if topo:
+        elementos.append(topo)
+        elementos.append(Spacer(1, 10))
+
+    elementos.append(Paragraph(f"Relatório — {evento['nome'] if evento else ''}", estilos["Title"]))
+    elementos.append(Paragraph(f"Tipo: {tipo} | Período: {data_inicio} a {data_fim}", estilos["Normal"]))
+    elementos.append(Spacer(1, 10))
+    elementos.append(Paragraph(f"Registros: {len(df)} | Quantidade total: {int(df['quantidade'].fillna(0).sum())} | Valor total: {moeda(df['valor_total'].fillna(0).sum())}", estilos["Normal"]))
+    elementos.append(Spacer(1, 14))
 
     colunas = ["created_at", "tipo", "nome", "produto", "quantidade", "forma_pagamento", "valor_total", "status"]
     cabecalho = ["Data", "Tipo", "Nome", "Produto", "Qtd", "Pagamento", "Valor", "Status"]
